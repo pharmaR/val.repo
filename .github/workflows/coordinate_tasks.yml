@@ -1,0 +1,185 @@
+name: PharmaR Validation Workflow
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.decision.outputs.packages }}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: yyjsonr
+
+      - name: Check packages on repos
+        id: decision
+        run: |
+          val_repo <- available.packages(repos = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
+          default_repos <- available.packages()
+          
+          new_packages <- setdiff(rownames(default_repos), rownames(val_repo))
+          columns <-  c("Package", "Version", "Repository")
+          repo_rel <- merge(val_repo[, columns], 
+                                     default_repos[, columns], by = c("Package", "Version"), all.x = TRUE, all.y = FALSE)
+          new_versions <- repo_rel$Package[is.na(repo_rel$Repository.x)]
+          library(yyjsonr)
+          opts_write_json(auto_unbox = FALSE)
+          cat(paste0("packages=", yyjsonr::write_json_str(my_vec)), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)
+          Sys.setenv(packages = c(new_packages, new_versions))
+        shell: Rscript {0}
+
+  calculate-metrics:
+    needs: check-updates
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+
+      - name: Install Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pak, github::pharmaR/val.meter
+
+      - name: Calculate Metrics
+        run: |
+          library(val.meter)
+          pkg_name <- Sys.getenv("PKG_NAME")
+          # 1. Calculate metrics
+          metrics_obj <- val.metrics::calculate_metrics(package = pkg_name)
+          
+          # 2. Save to file for the next job to pick up
+          dir.create("artifacts_out", showWarnings = FALSE)
+          saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
+        shell: Rscript {0}
+        with:
+          PKG_NAME: ${{ needs.check-updates.outputs.packages }}
+      - name: Upload Metrics Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-data
+          path: artifacts_out/metrics.rds
+          retention-days: 1
+
+  generate-report:
+    needs: calculate-metrics
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+
+      - name: Setup Pandoc
+        uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Download Metrics Data
+        uses: actions/download-artifact@v4
+        with:
+          name: metrics-data
+          path: downloaded_metrics
+
+      - name: Install Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pak, github::pharmaR/val.meter, github::pharmaR/val.report
+
+      - name: Generate Report
+        run: |
+          library(val.report)
+          
+          metrics_obj <- readRDS("downloaded_metrics/metrics.rds")
+          pkg_name <- desc::desc_get_field("Package")
+          
+          dir.create("validation_output", showWarnings = FALSE)
+          
+          val.reports::validation_report(
+            package = pkg_name,
+            metrics = metrics_obj,
+            output_dir = "validation_output"
+          )
+        shell: Rscript {0}
+
+      - name: Upload Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation_output/
+          retention-days: 30
+
+  update-repo-index:
+    needs: calculate-metrics
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Update PACKAGES file
+        run: |
+          tools::write_PACKAGES(dir = ".", type = "source")
+        shell: Rscript {0}
+
+      - name: Commit Index Updates
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add PACKAGES PACKAGES.gz
+          git diff-index --quiet HEAD || git commit -m "Update PACKAGES index [skip ci]"
+          git push
+
+  # -----------------------------------------------------------------
+  # JOB 5: Update Website
+  # -----------------------------------------------------------------
+  update-website:
+    needs: generate-report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Report
+        uses: actions/download-artifact@v4
+        with:
+          name: validation-report
+          path: website_content/validation
+
+      - name: Deploy to Website Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: website_content
+          target-folder: docs/validation
+          branch: gh-pages
+          clean: false
