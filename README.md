@@ -14,8 +14,10 @@ repository to the val.repo repository hosted on GitHub.
 
 ``` r
 options(
-    Pharma = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/repos",
+  repos = c(
+    Pharma = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/",
     CRAN = "https://cran.r-project.org"
+  )
 )
 ```
 
