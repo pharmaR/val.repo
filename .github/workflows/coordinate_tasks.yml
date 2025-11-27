@@ -63,6 +63,8 @@ jobs:
           extra-packages: any::pak, github::pharmaR/val.meter
 
       - name: Calculate Metrics
+        env:
+          PKG_NAME: ${{ needs.check-updates.outputs.packages }}
         run: |
           library(val.meter)
           pkg_name <- Sys.getenv("PKG_NAME")
@@ -73,8 +75,6 @@ jobs:
           dir.create("artifacts_out", showWarnings = FALSE)
           saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
         shell: Rscript {0}
-        with:
-          PKG_NAME: ${{ needs.check-updates.outputs.packages }}
       - name: Upload Metrics Artifact
         uses: actions/upload-artifact@v4
         with:
