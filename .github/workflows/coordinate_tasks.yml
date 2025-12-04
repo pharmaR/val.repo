@@ -32,15 +32,16 @@ jobs:
           val_repo <- available.packages(repos = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
           default_repos <- available.packages()
           
-          new_packages <- setdiff(rownames(default_repos), rownames(val_repo))
           columns <-  c("Package", "Version", "Repository")
           repo_rel <- merge(val_repo[, columns], 
-                                     default_repos[, columns], by = c("Package", "Version"), all.x = TRUE, all.y = FALSE)
-          new_versions <- repo_rel$Package[is.na(repo_rel$Repository.x)]
+                                     default_repos[, columns], by = c("Package", "Version"), all = TRUE)
+          # It has new versions of existing packages on the val.repo and new packages.
+          packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
+          
           library(yyjsonr)
           opts_write_json(auto_unbox = FALSE)
-          cat(paste0("packages=", yyjsonr::write_json_str(my_vec)), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)
-          Sys.setenv(packages = c(new_packages, new_versions))
+          cat(paste0("packages=", yyjsonr::write_json_str(packages)), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)
+          Sys.setenv(packages = packages)
         shell: Rscript {0}
 
   calculate-metrics:
@@ -63,11 +64,10 @@ jobs:
           extra-packages: any::pak, github::pharmaR/val.meter
 
       - name: Calculate Metrics
-        env:
-          PKG_NAME: ${{ needs.check-updates.outputs.packages }}
         run: |
           library(val.meter)
-          pkg_name <- Sys.getenv("PKG_NAME")
+          pkg_name <- desc::desc_get_field("Package")
+          
           # 1. Calculate metrics
           metrics_obj <- val.metrics::calculate_metrics(package = pkg_name)
           
@@ -75,6 +75,7 @@ jobs:
           dir.create("artifacts_out", showWarnings = FALSE)
           saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
         shell: Rscript {0}
+
       - name: Upload Metrics Artifact
         uses: actions/upload-artifact@v4
         with:
