@@ -159,7 +159,7 @@ jobs:
   # JOB 5: Update Website
   # -----------------------------------------------------------------
   update-website:
-    needs: generate-report
+    needs: calculate-metrics
     runs-on: ubuntu-latest
     permissions:
       contents: write
