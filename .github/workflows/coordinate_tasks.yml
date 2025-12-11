@@ -38,19 +38,20 @@ jobs:
       - name: Check packages on repos
         id: decision
         run: |
-          val_repo <- available.packages(repos = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
+          repo <- Sys.getenv("PHARMAPKGS_LOCAL_REPO", unset = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
+          val_repo <- available.packages(repos = repo)
           default_repos <- available.packages()
           
           columns <-  c("Package", "Version", "Repository")
           repo_rel <- merge(val_repo[, columns], 
-                                     default_repos[, columns], by = c("Package", "Version"), all = TRUE)
+                            default_repos[, columns], by = c("Package", "Version"), all = TRUE)
           # It has new versions of existing packages on the val.repo and new packages.
           packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
           
           library(yyjsonr)
-          opts_write_json(auto_unbox = FALSE)
-          cat(paste0("packages=", yyjsonr::write_json_str(packages)), file=Sys.getenv("GITHUB_OUTPUT"), append=TRUE)
-          Sys.setenv(packages = packages)
+          ops <- opts_write_json(auto_unbox = FALSE)
+          cat(paste0("packages=", yyjsonr::write_json_str(packages)), file=Sys.getenv("GITHUB_OUTPUT", unset = "pkges.json"), append=TRUE)
+          Sys.setenv(packages = toString(dQuote(packages, FALSE)))
         shell: Rscript {0}
 
   calculate-metrics:
@@ -76,12 +77,12 @@ jobs:
       - name: Install Dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pak, github::pharmaR/val.meter
+          extra-packages: any::pak, github::pharmaR/val.meter, github::pharmaR/val.report
 
       - name: Calculate Metrics
         run: |
           library(val.meter)
-          pkg_name = Sys.getenv("packages")
+          pkg_name = Sys.getenv("package")
           cat(pkg_name)
           # 1. Calculate metrics
           # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
@@ -90,47 +91,6 @@ jobs:
           #dir.create("artifacts_out", showWarnings = FALSE)
           #saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
         shell: Rscript {0}
-
-      - name: Upload Metrics Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: metrics-data
-          path: artifacts_out/metrics.rds
-          retention-days: 1
-
-  generate-report:
-    needs: [check-updates, calculate-metrics]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJson(needs.calculate-metrics.outputs.packages) }}
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          use-public-rspm: false
-
-      - name: Setup Pandoc
-        uses: r-lib/actions/setup-pandoc@v2
-      
-      - uses: quarto-dev/quarto-actions/setup@v2
-      
-      - name: Download Metrics Data
-        uses: actions/download-artifact@v4
-        with:
-          name: metrics-data
-          path: downloaded_metrics
-
-      - name: Install Dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: any::pak, github::pharmaR/val.meter, github::pharmaR/val.report
 
       - name: Generate Report
         run: |
@@ -148,12 +108,19 @@ jobs:
           )
         shell: Rscript {0}
 
-      - name: Upload Report Artifact
+      - name: Upload Report Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: validation-report
           path: validation_output/
           retention-days: 30
+ 
+      - name: Upload Metrics Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-data
+          path: artifacts_out/metrics.rds
+          retention-days: 1
 
   update-repo-index:
     needs: generate-report
