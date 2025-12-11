@@ -7,13 +7,22 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+    contents: write
+
+env:
+    PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
+    PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
+    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 100}}
+    PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'assess_covr_coverage,assess_r_cmd_check' }}
+    LOGGER_LOG_LEVEL: DEBUG
+
 jobs:
   check-updates:
+    name: Check package updates
     runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.decision.outputs.packages }}
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -47,8 +56,14 @@ jobs:
   calculate-metrics:
     needs: check-updates
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # If one package fails, don't stop the others
+      matrix:
+        package: ${{ fromJson(needs.check-updates.outputs.packages) }}
+    
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -66,14 +81,14 @@ jobs:
       - name: Calculate Metrics
         run: |
           library(val.meter)
-          pkg_name <- desc::desc_get_field("Package")
-          
+          pkg_name = Sys.getenv("packages")
+          cat(pkg_name)
           # 1. Calculate metrics
-          metrics_obj <- val.metrics::calculate_metrics(package = pkg_name)
+          # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
           
           # 2. Save to file for the next job to pick up
-          dir.create("artifacts_out", showWarnings = FALSE)
-          saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
+          #dir.create("artifacts_out", showWarnings = FALSE)
+          #saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
         shell: Rscript {0}
 
       - name: Upload Metrics Artifact
@@ -84,8 +99,12 @@ jobs:
           retention-days: 1
 
   generate-report:
-    needs: calculate-metrics
+    needs: [check-updates, calculate-metrics]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.calculate-metrics.outputs.packages) }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -99,7 +118,9 @@ jobs:
 
       - name: Setup Pandoc
         uses: r-lib/actions/setup-pandoc@v2
-
+      
+      - uses: quarto-dev/quarto-actions/setup@v2
+      
       - name: Download Metrics Data
         uses: actions/download-artifact@v4
         with:
@@ -135,7 +156,7 @@ jobs:
           retention-days: 30
 
   update-repo-index:
-    needs: calculate-metrics
+    needs: generate-report
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -145,19 +166,27 @@ jobs:
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
+        
+      - name: Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, quarto, pharmar/pharmapkgs
+        
 
-      - name: Update PACKAGES file
-        run: |
-          tools::write_PACKAGES(dir = ".", type = "source")
+      - name: Update package repositories
+        env:
+            PHARMAPKGS_PLATFORM: ${{ matrix.platform }}
+            PHARMAPKGS_R_VERSION: ${{ matrix.r_version }}
         shell: Rscript {0}
-
-      - name: Commit Index Updates
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add PACKAGES PACKAGES.gz
-          git diff-index --quiet HEAD || git commit -m "Update PACKAGES index [skip ci]"
-          git push
+            library("pharmapkgs")
+            github_actions()
+
+      - name: Compress reports
+        working-directory: src/contrib/Meta
+        run: |
+            tar czf reports.tar.gz *.md
+            rm *.md
 
   # -----------------------------------------------------------------
   # JOB 5: Update Website
@@ -170,17 +199,34 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Download Report
+        
+      # AGGREGATION STEP
+      # This downloads every artifact starting with 'validation-report-'
+      # and merges them into one folder.
+      - name: Download All Reports
         uses: actions/download-artifact@v4
         with:
-          name: validation-report
+          pattern: validation-report-*
+          merge-multiple: true
           path: website_content/validation
 
-      - name: Deploy to Website Branch
-        uses: JamesIves/github-pages-deploy-action@v4
+      # (Optional) List files to verify aggregation in logs
+      - name: Verify Aggregated Files
+        run: ls -lhR website_content/validation
+      
+      - uses: quarto-dev/quarto-actions/setup@v2
+      
+      - name: Render html pages
+        uses: quarto-dev/quarto-actions/render@v2
+  
+      - name: Remove search.json file
+        run: rm _site/search.json
+        
+      - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          folder: website_content
-          target-folder: docs/validation
-          branch: gh-pages
-          clean: false
+            commit_message: "Auto-update: ${{matrix.platform}}, R-${{matrix.r_version}}"
+            file_pattern: ${{ github.workspace }}/src/contrib/Meta/*.tar.gz ${{ github.workspace }}/src/contrib/PACKAGES
+            add_options: '-u'
+
+      - name: Remove untracked files
+        run: git clean -fdx
