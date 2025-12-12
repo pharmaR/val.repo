@@ -12,7 +12,7 @@ permissions:
 
 env:
     PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
-    PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
+    PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}/..
     PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 100}}
     PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'assess_covr_coverage,assess_r_cmd_check' }}
     LOGGER_LOG_LEVEL: DEBUG
@@ -47,7 +47,9 @@ jobs:
                             default_repos[, columns], by = c("Package", "Version"), all = TRUE)
           # It has new versions of existing packages on the val.repo and new packages.
           packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
-          
+          # GHA limit is 256: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrix
+          # See problems/situations https://github.com/orgs/community/discussions/38704
+          packages <- packages[seq_len(min(length(packages), as.numeric(Sys.getenv("PHARMAPKGS_LIMIT", unset = 250))))]
           library(yyjsonr)
           ops <- opts_write_json(auto_unbox = FALSE)
           cat(paste0("packages=", yyjsonr::write_json_str(packages)), file=Sys.getenv("GITHUB_OUTPUT", unset = "pkges.json"), append=TRUE)
