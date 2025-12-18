@@ -1,0 +1,206 @@
+name: PharmaR Validation Workflow
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+    contents: write
+
+env:
+    PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
+    PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
+    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 10}}
+    PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'assess_covr_coverage,assess_r_cmd_check' }}
+    LOGGER_LOG_LEVEL: DEBUG
+
+jobs:
+  check-updates:
+    name: Check package updates
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.decision.outputs.packages }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+          Ncpus: 4
+          
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: yyjsonr
+
+      - name: Check packages on repos
+        id: decision
+        run: |
+          repo <- Sys.getenv("PHARMAPKGS_LOCAL_REPO", unset = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
+          val_repo <- available.packages(repos = repo)
+          default_repos <- available.packages()
+          
+          columns <-  c("Package", "Version", "Repository")
+          repo_rel <- merge(val_repo[, columns], 
+                            default_repos[, columns], by = c("Package", "Version"), all = TRUE)
+          # It has new versions of existing packages on the val.repo and new packages.
+          packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
+          # GHA limit is 256: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrix
+          # See problems/situations https://github.com/orgs/community/discussions/38704
+          packages <- packages[seq_len(min(length(packages), as.numeric(Sys.getenv("PHARMAPKGS_LIMIT", unset = 250))))]
+          library(yyjsonr)
+          ops <- opts_write_json(auto_unbox = FALSE)
+          cat(packages)
+          cat(paste0("packages=", yyjsonr::write_json_str(packages)), file=Sys.getenv("GITHUB_OUTPUT", unset = "pkges.json"), append=TRUE)
+          Sys.setenv(packages = toString(dQuote(packages, FALSE)))
+        shell: Rscript {0}
+
+  calculate-metrics:
+    needs: check-updates
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # If one package fails, don't stop the others
+      matrix:
+        package: ${{ fromJson(needs.check-updates.outputs.packages) }}
+    
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+          Ncpus: 4
+
+      - name: Install Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: PKG_NAME
+          extra-packages: any::pak, github::pharmaR/val.meter, github::pharmaR/val.report
+
+      - name: Calculate Metrics
+        run: |
+          library(val.meter)
+          pkg_name = Sys.getenv("package")
+          cat(pkg_name)
+          # 1. Calculate metrics
+          # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
+          
+          # 2. Save to file for the next job to pick up
+          #dir.create("artifacts_out", showWarnings = FALSE)
+          #saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
+        shell: Rscript {0}
+
+      - name: Generate Report
+        run: |
+          library(val.report)
+          
+          metrics_obj <- readRDS("artifacts_out/metrics.rds")
+          pkg_name <- desc::desc_get_field("Package")
+          
+          dir.create("validation_output", showWarnings = FALSE)
+          
+          val.reports::validation_report(
+            package = pkg_name,
+            metrics = metrics_obj,
+            output_dir = "validation_output"
+          )
+        shell: Rscript {0}
+
+      - name: Upload Report Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation_output/
+          retention-days: 30
+ 
+      - name: Upload Metrics Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-data
+          path: artifacts_out/metrics.rds
+          retention-days: 1
+
+  update-repo-index:
+    needs: calculate-metrics
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        
+      - name: Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, quarto, pharmar/pharmapkgs
+        
+
+      - name: Update package repositories
+        env:
+            PHARMAPKGS_PLATFORM: ${{ matrix.platform }}
+            PHARMAPKGS_R_VERSION: ${{ matrix.r_version }}
+        shell: Rscript {0}
+        run: |
+            library("pharmapkgs")
+            github_actions()
+
+      - name: Compress reports
+        working-directory: src/contrib/Meta
+        run: |
+            tar czf reports.tar.gz *.md
+            rm *.md
+
+  # -----------------------------------------------------------------
+  # JOB 5: Update Website
+  # -----------------------------------------------------------------
+  update-website:
+    needs: calculate-metrics
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      # AGGREGATION STEP
+      # This downloads every artifact starting with 'validation-report-'
+      # and merges them into one folder.
+      - name: Download All Reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: validation-report-*
+          merge-multiple: true
+          path: website_content/validation
+
+      # (Optional) List files to verify aggregation in logs
+      - name: Verify Aggregated Files
+        run: ls -lhR website_content/validation
+      
+      - uses: quarto-dev/quarto-actions/setup@v2
+      
+      - name: Render html pages
+        uses: quarto-dev/quarto-actions/render@v2
+  
+      - name: Remove search.json file
+        run: rm _site/search.json
+        
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+            commit_message: "Auto-update: ${{matrix.platform}}, R-${{matrix.r_version}}"
+            file_pattern: ${{ github.workspace }}/src/contrib/Meta/*.tar.gz ${{ github.workspace }}/src/contrib/PACKAGES
+            add_options: '-u'
+
+      - name: Remove untracked files
+        run: git clean -fdx
