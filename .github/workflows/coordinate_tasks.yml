@@ -132,6 +132,7 @@ jobs:
 
   update-repo-index:
     needs: calculate-metrics
+    if: ${{ contains(needs.*.result, 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
