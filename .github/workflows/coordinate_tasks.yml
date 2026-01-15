@@ -84,11 +84,12 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: PKG_NAME
-          extra-packages: any::pak, github::pharmaR/val.meter, github::pharmaR/val.report
+          extra-packages: any::pak, github::pharmaR/riskmetric, github::pharmaR/val.meter, github::pharmaR/val.report
 
       - name: Calculate Metrics
         run: |
-          library(val.meter)
+          library("riskmetric")
+          library("val.meter")
           pkg_name = Sys.getenv("package")
           cat(pkg_name)
           # 1. Calculate metrics
@@ -101,7 +102,7 @@ jobs:
 
       - name: Generate Report
         run: |
-          library(val.report)
+          library("val.report")
           
           metrics_obj <- readRDS("artifacts_out/metrics.rds")
           pkg_name <- desc::desc_get_field("Package")
@@ -166,7 +167,7 @@ jobs:
   # JOB 5: Update Website
   # -----------------------------------------------------------------
   update-website:
-    needs: calculate-metrics
+    needs: update-repo-index
     runs-on: ubuntu-latest
     permissions:
       contents: write
