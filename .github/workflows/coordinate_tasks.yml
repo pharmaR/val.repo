@@ -83,7 +83,7 @@ jobs:
       - name: Install Dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          packages: PKG_NAME
+          packages: ${{ matrix.package }}
           extra-packages: any::pak, github::pharmaR/riskmetric, github::pharmaR/val.meter, github::pharmaR/val.report
 
       - name: Calculate Metrics
