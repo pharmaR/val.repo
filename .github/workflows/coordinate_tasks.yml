@@ -107,7 +107,7 @@ jobs:
       - name: Upload Metrics Artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: {{ matrix.package }}-metric
+          name: ${{ matrix.package }}-metric
           path: artifacts_out/*.rds
           retention-days: 30
           
@@ -130,7 +130,7 @@ jobs:
       - name: Upload Report Artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: validation-report-{{ matrix.package }}
+          name: validation-report-${{ matrix.package }}
           path: validation_output/
           retention-days: 30
 
