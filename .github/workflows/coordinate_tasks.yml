@@ -94,12 +94,12 @@ jobs:
           cat(pkg_name)
           
           # Download source of the package installed to be ableo to assess it better
-          download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
-                        pkg_name, packageDescription(pkg_name, fields = "Version")),
-                        "package.tar.gz")
+          # download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
+          #               pkg_name, packageDescription(pkg_name, fields = "Version")),
+          #               "package.tar.gz")
           files <- download.packages(pkg_name, destdir = ".")
           utils::untar(files[, 2], exdir = ".")
-          download.packages(pkg_name, destdir = ".")
+          # download.packages(pkg_name, destdir = ".")
           # 1. Calculate metrics
           pkg_ref <- pkg_ref(pkg_name, source = "pkg_source")
           pa <- pkg_assess(pkg_ref)
@@ -143,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: validation-report-${{ matrix.package }}
-          path: validation_output/
+          path: validation_output/*
           retention-days: 30
 
   update-repo-index:
