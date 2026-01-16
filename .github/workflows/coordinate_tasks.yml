@@ -121,7 +121,8 @@ jobs:
           dir.create(output_dir, showWarnings = FALSE)
           options("valreport_output_dir" = output_dir)
           val.report::package_report(
-            package = pkg_name,
+            package_name = pkg_name,
+            package_version = packageVersion(pkg_name),
             params = list(
               image = Sys.getenv("RUNNER_OS", "rhub/ref-image"),
               assessment_path = assessment_path
