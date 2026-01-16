@@ -117,13 +117,15 @@ jobs:
           
           pkg_name <- Sys.getenv("PKG_NAME")
           assessment_path <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
-          dir.create("validation_output", showWarnings = FALSE)
-          val.report::validation_report(
+          output_dir <- "validation_output"
+          dir.create(output_dir, showWarnings = FALSE)
+          options("valreport_output_dir" = output_dir)
+          val.report::package_report(
             package = pkg_name,
             params = list(
+              image = Sys.getenv("RUNNER_OS", "rhub/ref-image"),
               assessment_path = assessment_path
-            ),
-            output_dir = "validation_output"
+            )
           )
         shell: Rscript {0}
 
