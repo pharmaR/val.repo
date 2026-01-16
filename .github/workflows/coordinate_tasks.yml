@@ -90,28 +90,39 @@ jobs:
         run: |
           library("riskmetric")
           library("val.meter")
-          pkg_name = Sys.getenv("package")
+          pkg_name <- Sys.getenv("PKG_NAME")
           cat(pkg_name)
           # 1. Calculate metrics
+          pkg_ref <- pkg_ref(pkg_name)
+          pa <- pkg_assess(pkg_ref)
+          
           # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
           
           # 2. Save to file for the next job to pick up
-          #dir.create("artifacts_out", showWarnings = FALSE)
+          dir.create("artifacts_out", showWarnings = FALSE)
+          saveRDS(pa, file = "artifacts_out/metrics.rds")
           #saveRDS(metrics_obj, file = "artifacts_out/metrics.rds")
         shell: Rscript {0}
 
+      - name: Upload Metrics Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-data
+          path: artifacts_out/metrics.rds
+          retention-days: 30
+          
       - name: Generate Report
         run: |
           library("val.report")
           
-          metrics_obj <- readRDS("artifacts_out/metrics.rds")
-          pkg_name <- desc::desc_get_field("Package")
+          pkg_name <- Sys.getenv("PKG_NAME")
           
           dir.create("validation_output", showWarnings = FALSE)
-          
           val.reports::validation_report(
             package = pkg_name,
-            metrics = metrics_obj,
+            params = list(
+              assessment_path = "artifacts_out/metrics.rds"
+              )
             output_dir = "validation_output"
           )
         shell: Rscript {0}
@@ -123,12 +134,6 @@ jobs:
           path: validation_output/
           retention-days: 30
  
-      - name: Upload Metrics Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: metrics-data
-          path: artifacts_out/metrics.rds
-          retention-days: 1
 
   update-repo-index:
     needs: calculate-metrics
