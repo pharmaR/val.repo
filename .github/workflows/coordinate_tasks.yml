@@ -118,7 +118,7 @@ jobs:
           pkg_name <- Sys.getenv("PKG_NAME")
           assessment_path <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
           dir.create("validation_output", showWarnings = FALSE)
-          val.reports::validation_report(
+          val.report::validation_report(
             package = pkg_name,
             params = list(
               assessment_path = assessment_path
