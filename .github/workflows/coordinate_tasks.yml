@@ -92,15 +92,23 @@ jobs:
           library("val.meter")
           pkg_name <- Sys.getenv("PKG_NAME")
           cat(pkg_name)
+          
+          # Download source of the package installed to be ableo to assess it better
+          download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
+                        pkg_name, packageDescription(pkg_name, fields = "Version")),
+                        "package.tar.gz")
+          files <- download.packages(pkg_name, destdir = ".")
+          utils::untar(files[, 2], exdir = ".")
+          download.packages(pkg_name, destdir = ".")
           # 1. Calculate metrics
-          pkg_ref <- pkg_ref(pkg_name)
+          pkg_ref <- pkg_ref(pkg_name, source = "pkg_source")
           pa <- pkg_assess(pkg_ref)
           
           # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
           
           # 2. Save to file for the next job to pick up
           dir.create("artifacts_out", showWarnings = FALSE)
-          file_metrics <- file.path("artifacts_out", paste0(pkg_name, ".rds")
+          file_metrics <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
           saveRDS(pa, file = file_metrics)
           #saveRDS(metrics_obj, file = file_metrics)
         shell: Rscript {0}
@@ -123,7 +131,7 @@ jobs:
           options("valreport_output_dir" = output_dir)
           val.report::package_report(
             package_name = pkg_name,
-            package_version = packageVersion(pkg_name),
+            package_version = packageDescription(pkg_name, fields = "Version"),
             params = list(
               image = Sys.getenv("RUNNER_OS", "rhub/ref-image"),
               assessment_path = assessment_path
