@@ -100,8 +100,9 @@ jobs:
           
           # 2. Save to file for the next job to pick up
           dir.create("artifacts_out", showWarnings = FALSE)
-          saveRDS(pa, file = "artifacts_out/metrics.rds")
-          #saveRDS(metrics_obj, file = file.path("artifacts_out", paste0(pkg_name, ".rds"))
+          file_metrics <- file.path("artifacts_out", paste0(pkg_name, ".rds")
+          saveRDS(pa, file = file_metrics)
+          #saveRDS(metrics_obj, file = file_metrics)
         shell: Rscript {0}
 
       - name: Upload Metrics Artifacts
