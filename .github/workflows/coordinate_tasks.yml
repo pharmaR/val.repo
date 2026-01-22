@@ -143,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: validation-report-${{ matrix.package }}
-          path: validation_output/*
+          path: _site/validation_output/*
           retention-days: 30
 
   update-repo-index:
