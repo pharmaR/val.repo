@@ -13,10 +13,10 @@ repository to the val.repo repository hosted on GitHub.
 ### Using the Repository
 
 ``` r
-options(
-    Pharma = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/repos",
-    CRAN = "https://cran.r-project.org"
-)
+options(repos = c(
+  Pharma = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/",
+  CRAN = "https://cran.r-project.org"
+))
 ```
 
 Once set, calling `available.packages()` will list the packages
