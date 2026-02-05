@@ -14,7 +14,7 @@ env:
     PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
     PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
     PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 10}} # Limit to max 250 => 500 artifacts 
-    PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || NULL }}
+    PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'NULL' }}
     LOGGER_LOG_LEVEL: DEBUG
 
 jobs:
