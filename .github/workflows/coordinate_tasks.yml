@@ -67,7 +67,8 @@ jobs:
       fail-fast: false # If one package fails, don't stop the others
       matrix:
         package: ${{ fromJson(needs.check-updates.outputs.packages) }}
-
+    outputs:
+      package: ${{ matrix.package }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
@@ -127,12 +128,12 @@ jobs:
     strategy:
       fail-fast: false # If one package fails, don't stop the others
       matrix:
-        package: ${{ fromJson(needs.check-updates.outputs.packages) }}
+        package:  ${{ fromJson(needs.calculate-metrics.outputs.package) }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
     steps:
-      - name: Download metrics:
+      - name: Download metrics
         uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.package }}-metric.rds
@@ -183,9 +184,6 @@ jobs:
           extra-packages: any::pkgdown, quarto, pharmar/pharmapkgs
 
       - name: Update package repositories
-        env:
-            PHARMAPKGS_PLATFORM: ${{ matrix.platform }}
-            PHARMAPKGS_R_VERSION: ${{ matrix.r_version }}
         shell: Rscript {0}
         run: |
             library("pharmapkgs")
@@ -244,7 +242,7 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-            commit_message: "Auto-update: ${{matrix.platform}}, R-${{matrix.r_version}}"
+            commit_message: "Auto-update"
             file_pattern: ${{ github.workspace }}/src/contrib/Meta/*.tar.gz ${{ github.workspace }}/src/contrib/PACKAGES
             add_options: '-u'
 
