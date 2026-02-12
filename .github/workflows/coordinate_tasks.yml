@@ -51,7 +51,11 @@ jobs:
           packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
           # GHA limit is 256: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrix
           # See problems/situations https://github.com/orgs/community/discussions/38704
-          packages <- packages[seq_len(min(length(packages), as.numeric(Sys.getenv("PHARMAPKGS_LIMIT", unset = 250))))]
+          max_n_pkgs <- as.numeric(Sys.getenv("PHARMAPKGS_LIMIT", unset = 250))
+          n_pkgs2update <- length(packages)
+          n_pkgs <- min(n_pkgs2update, max_n_pkgs)
+          # Randomize which packages are added FIXME: mostly for testing the pipeline
+          packages <- packages[sample(n_pkgs2update, n_pkges)]
           library(yyjsonr)
           ops <- opts_write_json(auto_unbox = FALSE)
           cat(packages)
