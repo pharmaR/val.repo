@@ -13,7 +13,7 @@ permissions:
 env:
     PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
     PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
-    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 250 }} # Limit to max 250 => 500 artifacts 
+    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 250 }} # Limit to max 250 => 500 artifacts
     PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'NULL' }}
     LOGGER_LOG_LEVEL: DEBUG
 
@@ -32,7 +32,7 @@ jobs:
         with:
           use-public-rspm: false
           Ncpus: 4
-          
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: yyjsonr
@@ -43,9 +43,9 @@ jobs:
           repo <- Sys.getenv("PHARMAPKGS_LOCAL_REPO", unset = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
           val_repo <- available.packages(repos = repo)
           default_repos <- available.packages()
-          
+
           columns <-  c("Package", "Version", "Repository")
-          repo_rel <- merge(val_repo[, columns], 
+          repo_rel <- merge(val_repo[, columns],
                             default_repos[, columns], by = c("Package", "Version"), all = TRUE)
           # It has new versions of existing packages on the val.repo and new packages.
           packages <- repo_rel$Package[is.na(repo_rel$Repository.x)]
@@ -67,7 +67,7 @@ jobs:
       fail-fast: false # If one package fails, don't stop the others
       matrix:
         package: ${{ fromJson(needs.check-updates.outputs.packages) }}
-    
+
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
@@ -93,7 +93,7 @@ jobs:
           library("val.meter")
           pkg_name <- Sys.getenv("PKG_NAME")
           cat(pkg_name)
-          
+
           # Download source of the package installed to be ableo to assess it better
           # download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
           #               pkg_name, packageDescription(pkg_name, fields = "Version")),
@@ -104,9 +104,9 @@ jobs:
           # 1. Calculate metrics
           pkg_ref <- pkg_ref(pkg_name, source = "pkg_source")
           pa <- pkg_assess(pkg_ref)
-          
+
           # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
-          
+
           # 2. Save to file for the next job to pick up
           dir.create("artifacts_out", showWarnings = FALSE)
           file_metrics <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
@@ -120,11 +120,28 @@ jobs:
           name: ${{ matrix.package }}-metric
           path: artifacts_out/*.rds
           retention-days: 30
-          
+  generate-report:
+    needs: calculate-metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # https://stackoverflow.com/a/59076067
+    strategy:
+      fail-fast: false # If one package fails, don't stop the others
+      matrix:
+        package: ${{ fromJson(needs.check-updates.outputs.packages) }}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
+      - name: Download metrics:
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ matrix.package }}-metric.rds
+          path: artifacts_out/${{ matrix.package }}-metric.rds
+
       - name: Generate Report
         run: |
           library("val.report")
-          
+
           pkg_name <- Sys.getenv("PKG_NAME")
           assessment_path <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
           output_dir <- "validation_output"
@@ -159,7 +176,7 @@ jobs:
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
-        
+
       - name: Dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
@@ -195,14 +212,14 @@ jobs:
   # JOB 5: Update Website
   # -----------------------------------------------------------------
   update-website:
-    needs: update-repo-index
+    needs: generate-report
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
-        
+
       # AGGREGATION STEP
       # This downloads every artifact starting with 'validation-report-'
       # and merges them into one folder.
@@ -216,15 +233,15 @@ jobs:
       # (Optional) List files to verify aggregation in logs
       - name: Verify Aggregated Files
         run: ls -lhR website_content/validation
-      
+
       - uses: quarto-dev/quarto-actions/setup@v2
-      
+
       - name: Render html pages
         uses: quarto-dev/quarto-actions/render@v2
-  
+
       - name: Remove search.json file
         run: rm _site/search.json
-        
+
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
             commit_message: "Auto-update: ${{matrix.platform}}, R-${{matrix.r_version}}"
