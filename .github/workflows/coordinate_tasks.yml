@@ -128,10 +128,10 @@ jobs:
       fail-fast: false # If one package fails, don't stop the others
       matrix:
         package: ${{ fromJson(needs.check-updates.outputs.packages) }}
-
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
+    steps:
       - name: Download metrics:
         uses: actions/download-artifact@v7
         with:
