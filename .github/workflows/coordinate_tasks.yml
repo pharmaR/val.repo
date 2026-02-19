@@ -99,7 +99,7 @@ jobs:
           pkg_name <- Sys.getenv("PKG_NAME")
           cat(pkg_name)
 
-          # Download source of the package installed to be ableo to assess it better
+          # Download source of the package installed to be able to assess it better
           # download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
           #               pkg_name, packageDescription(pkg_name, fields = "Version")),
           #               "package.tar.gz")
@@ -186,6 +186,11 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::pkgdown, quarto, pharmar/pharmapkgs
+      - name: Download scores
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ matrix.package }}-metric.rds
+          path: artifacts_out/${{ matrix.package }}-metric.rds
 
       - name: Update package repositories
         shell: Rscript {0}
@@ -194,13 +199,16 @@ jobs:
             .config <- pharmapkgs:::.config
             remote_packages <- get_packages()
             local_packages <- get_packages(base_url = .config$local_repo)
-            new_packages <- diff_packages(remote_packages, local_packages)
-            scoring_result <- score_packages(new_packages)
-            if (is.null(scoring_result)) {
+
+            assessment_path <- list.files("artifacts_out", ".rds$")
+            if (!length(assessment_path)) {
               logger::log_info("No new packages to score", namespace = "pharmapkgs")
-              return()
+              q(save = "no")
             }
-            scored_packages <- add_score_to_packages(remote_packages, scoring_result$scored_packages)
+            names(assessment_path) <- tools::file_path_sans_ext(basename(assessment_path))
+            pkgs_metrics <- lapply(assessment_path, readRDS)
+            new_metrics_packages <- as.data.frame(lapply(pkgs_metrics, as.character))
+            scored_packages <- add_score_to_packages(remote_packages, new_metrics_packages)
             new_local_packages <- update_packages(local_packages, scored_packages)
             write_packages(new_local_packages)
 
