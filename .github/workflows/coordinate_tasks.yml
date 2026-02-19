@@ -55,7 +55,7 @@ jobs:
           n_pkgs2update <- length(packages)
           n_pkgs <- min(n_pkgs2update, max_n_pkgs)
           # Randomize which packages are added FIXME: mostly for testing the pipeline
-          packages <- packages[sample(n_pkgs2update, n_pkges)]
+          packages <- packages[sample(n_pkgs2update, n_pkgs)]
           library(yyjsonr)
           ops <- opts_write_json(auto_unbox = FALSE)
           cat(packages)
