@@ -171,6 +171,7 @@ jobs:
 
   update-repo-index:
     needs: calculate-metrics
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
