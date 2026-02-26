@@ -127,6 +127,7 @@ jobs:
           retention-days: 30
   generate-report:
     needs: calculate-metrics
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30 # https://stackoverflow.com/a/59076067
     strategy:
@@ -186,11 +187,11 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::pkgdown, quarto, pharmar/pharmapkgs
+
       - name: Download scores
         uses: actions/download-artifact@v7
         with:
-          name: ${{ matrix.package }}-metric.rds
-          path: artifacts_out/${{ matrix.package }}-metric.rds
+          path: artifacts_out
 
       - name: Update package repositories
         shell: Rscript {0}
@@ -224,6 +225,7 @@ jobs:
   update-website:
     needs: generate-report
     runs-on: ubuntu-latest
+    if: always()
     permissions:
       contents: write
     steps:
