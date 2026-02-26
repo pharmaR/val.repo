@@ -141,8 +141,7 @@ jobs:
       - name: Download metrics
         uses: actions/download-artifact@v7
         with:
-          name: ${{ matrix.package }}-metric.rds
-          path: artifacts_out/${{ matrix.package }}-metric.rds
+          path: artifacts_out/
 
       - name: Generate Report
         run: |
