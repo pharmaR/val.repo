@@ -20,9 +20,9 @@ env:
     RENV_PROJECT: ""
 
 jobs:
+  runs-on: ubuntu-latest
   check-updates:
     name: Check package updates
-    runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.decision.outputs.packages }}
     steps:
@@ -67,7 +67,6 @@ jobs:
 
   calculate-metrics:
     needs: check-updates
-    runs-on: ubuntu-latest
     timeout-minutes: 30 # TODO: change limit # https://stackoverflow.com/a/59076067
     strategy:
       fail-fast: false # If one package fails, don't stop the others
@@ -138,7 +137,6 @@ jobs:
   generate-report:
     needs: calculate-metrics
     if: always()
-    runs-on: ubuntu-latest
     timeout-minutes: 30 # https://stackoverflow.com/a/59076067
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -178,7 +176,6 @@ jobs:
   update-repo-index:
     needs: calculate-metrics
     if: always()
-    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
@@ -229,7 +226,6 @@ jobs:
   # -----------------------------------------------------------------
   update-website:
     needs: generate-report
-    runs-on: ubuntu-latest
     if: always()
     permissions:
       contents: write
