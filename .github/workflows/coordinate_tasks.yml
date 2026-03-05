@@ -16,6 +16,7 @@ env:
     PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 250 }} # Limit to max 250 => 500 artifacts
     PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'NULL' }}
     LOGGER_LOG_LEVEL: DEBUG
+    RENV_PROJECT: ""
 
 jobs:
   check-updates:
