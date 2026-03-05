@@ -126,6 +126,14 @@ jobs:
           name: ${{ matrix.package }}-metric
           path: artifacts_out/*.rds
           retention-days: 30
+   open-issue:
+    needs: calculate-metrics
+    if: failure()
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: gh issue create -l metrics -b "Package ${{ matrix.package }} failed to calculate metrics. [Check the GHA](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_JOB)" -t "Metrics failed for ${{ matrix.package }}"
   generate-report:
     needs: calculate-metrics
     if: always()
