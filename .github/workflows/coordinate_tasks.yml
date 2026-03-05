@@ -13,7 +13,8 @@ permissions:
 env:
     PHARMAPKGS_REMOTE_REPO: https://cloud.r-project.org/
     PHARMAPKGS_LOCAL_REPO: ${{ github.workspace }}
-    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 250 }} # Limit to max 250 => 500 artifacts
+    PHARMAPKGS_LIMIT: ${{ vars.PHARMAPKGS_LIMIT || 20 }} # Limit to max 250 => 500 artifacts
+    # Public concurrent limits 20
     PHARMAPKGS_EXCLUDED_METRICS: ${{ vars.PHARMAPKGS_EXCLUDED_METRICS || 'NULL' }}
     LOGGER_LOG_LEVEL: DEBUG
     RENV_PROJECT: ""
