@@ -128,9 +128,9 @@ jobs:
           path: artifacts_out/*.rds
           retention-days: 30
    open-issue:
-    runs-on: ubuntu-latest
     needs: calculate-metrics
     if: failure()
+    runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -138,8 +138,8 @@ jobs:
       - run: gh issue create -l metrics -b "Package ${{ matrix.package }} failed to calculate metrics. [Check the GHA](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_JOB)" -t "Metrics failed for ${{ matrix.package }}"
   generate-report:
     needs: calculate-metrics
-    runs-on: ubuntu-latest
     if: always()
+    runs-on: ubuntu-latest
     timeout-minutes: 30 # https://stackoverflow.com/a/59076067
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -178,8 +178,8 @@ jobs:
 
   update-repo-index:
     needs: calculate-metrics
-    runs-on: ubuntu-latest
     if: always()
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
@@ -219,15 +219,15 @@ jobs:
             new_local_packages <- update_packages(local_packages, scored_packages)
             write_packages(new_local_packages)
       - name: Commit file
-        shell: git add src/contrib/PACKAGES & git commit -m "Update score" & git push
+        run: git add src/contrib/PACKAGES & git commit -m "Update score" & git push
 
 
   # -----------------------------------------------------------------
   # JOB 5: Update Website
   # -----------------------------------------------------------------
   update-website:
-    runs-on: ubuntu-latest
     needs: generate-report
+    runs-on: ubuntu-latest
     if: always()
     permissions:
       contents: write
