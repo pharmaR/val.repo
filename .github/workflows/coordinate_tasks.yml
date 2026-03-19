@@ -140,13 +140,9 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30 # https://stackoverflow.com/a/59076067
-    strategy:
-      fail-fast: false # If one package fails, don't stop the others
-      matrix:
-        package: ${{ needs.calculate-metrics.outputs.package }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
+      PKG_NAME: ${{  needs.calculate-metrics.outputs.package }} # Pass matrix value to Env Var
     steps:
       - name: Download metrics
         uses: actions/download-artifact@v7
@@ -174,7 +170,7 @@ jobs:
       - name: Upload Report Artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: validation-report-${{ matrix.package }}
+          name: validation-report-${{ needs.calculate-metrics.outputs.package }}
           path: _site/validation_output/*
           retention-days: 30
 
@@ -216,8 +212,11 @@ jobs:
             names(assessment_path) <- tools::file_path_sans_ext(basename(assessment_path))
             pkgs_metrics <- lapply(assessment_path, readRDS)
             new_metrics_packages <- as.data.frame(lapply(pkgs_metrics, as.character))
+            cat("New metrics packages provided")
             scored_packages <- add_score_to_packages(remote_packages, new_metrics_packages)
+            cat("Added scores")
             new_local_packages <- update_packages(local_packages, scored_packages)
+            cat("Updated packages")
             write_packages(new_local_packages)
       - name: Commit file
         run: |
