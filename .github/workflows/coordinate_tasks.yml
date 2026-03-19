@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: ${{ fromJson(needs.calculate-metrics.outputs.package) }}
+        package: ${{ needs.calculate-metrics.outputs.package }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -143,7 +143,7 @@ jobs:
     strategy:
       fail-fast: false # If one package fails, don't stop the others
       matrix:
-        package: ${{ fromJson(needs.calculate-metrics.outputs.package) }}
+        package: ${{ needs.calculate-metrics.outputs.package }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
