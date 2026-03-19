@@ -248,8 +248,8 @@ jobs:
           path: website_content/validation
 
       # (Optional) List files to verify aggregation in logs
-      - name: Verify Aggregated Files
-        run: ls -lhR website_content/validation
+      # - name: Verify Aggregated Files
+      #   run: ls -lhR website_content/validation
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
