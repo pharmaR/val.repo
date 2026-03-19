@@ -220,7 +220,7 @@ jobs:
             remote_packages <- get_packages()
             local_packages <- get_packages(base_url = .config$local_repo)
             assessment_path <- list.files("artifacts_out", ".rds$")
-            cat(sprintf("assessment_path:, %s", toString(sQuote(assessment_path))))
+            cat(sprintf("assessment_path:, %s", toString(sQuote(assessment_path))), file = stderr())
             if (!length(assessment_path)) {
               logger::log_info("No new packages to score", namespace = "pharmapkgs")
               q(save = "no")
@@ -228,11 +228,11 @@ jobs:
             names(assessment_path) <- tools::file_path_sans_ext(basename(assessment_path))
             pkgs_metrics <- lapply(assessment_path, readRDS)
             new_metrics_packages <- as.data.frame(lapply(pkgs_metrics, as.character))
-            cat("New metrics packages provided")
+            cat("New metrics packages provided", file = stderr())
             scored_packages <- add_score_to_packages(remote_packages, new_metrics_packages)
-            cat("Added scores")
+            cat("Added scores", file = stderr())
             new_local_packages <- update_packages(local_packages, scored_packages)
-            cat("Updated packages")
+            cat("Updated packages", file = stderr())
             write_packages(new_local_packages)
       - name: Commit file
         run: |
