@@ -45,7 +45,6 @@ jobs:
           repo <- Sys.getenv("PHARMAPKGS_LOCAL_REPO", unset = "https://raw.githubusercontent.com/pharmaR/val.repo/refs/heads/main/")
           val_repo <- available.packages(repos = repo)
           default_repos <- available.packages()
-
           columns <-  c("Package", "Version", "Repository")
           repo_rel <- merge(val_repo[, columns],
                             default_repos[, columns], by = c("Package", "Version"), all = TRUE)
@@ -100,7 +99,6 @@ jobs:
           library("val.meter")
           pkg_name <- Sys.getenv("PKG_NAME")
           cat(pkg_name)
-
           # Download source of the package installed to be able to assess it better
           # download.file(sprintf("https://cloud.r-project.org/package=%s&version=%s",
           #               pkg_name, packageDescription(pkg_name, fields = "Version")),
@@ -111,9 +109,7 @@ jobs:
           # 1. Calculate metrics
           pkg_ref <- pkg_ref(pkg_name, source = "pkg_source")
           pa <- pkg_assess(pkg_ref)
-
           # metrics_obj <- val.meter::calculate_metrics(package = pkg_name)
-
           # 2. Save to file for the next job to pick up
           dir.create("artifacts_out", showWarnings = FALSE)
           file_metrics <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
@@ -127,7 +123,7 @@ jobs:
           name: ${{ matrix.package }}-metric
           path: artifacts_out/*.rds
           retention-days: 30
-   open-issue:
+  open-issue:
     needs: calculate-metrics
     if: failure()
     runs-on: ubuntu-latest
@@ -138,12 +134,16 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - run: gh issue create -l metrics -b "Package ${{ PKG_NAME }} failed to calculate metrics. [Check the GHA](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_JOB)" -t "Metrics failed for ${{ PKG_NAME }}"
+      - run: gh issue create -l metrics -b "Package ${{ matrix.package }} failed to calculate metrics. [Check the GHA](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_JOB)" -t "Metrics failed for ${{ matrix.package }}"
   generate-report:
     needs: calculate-metrics
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30 # https://stackoverflow.com/a/59076067
+    strategy:
+      fail-fast: false # If one package fails, don't stop the others
+      matrix:
+        package: ${{ fromJson(needs.calculate-metrics.outputs.package) }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PKG_NAME: ${{ matrix.package }} # Pass matrix value to Env Var
@@ -156,7 +156,6 @@ jobs:
       - name: Generate Report
         run: |
           library("val.report")
-
           pkg_name <- Sys.getenv("PKG_NAME")
           assessment_path <- file.path("artifacts_out", paste0(pkg_name, ".rds"))
           output_dir <- "validation_output"
@@ -209,7 +208,6 @@ jobs:
             .config <- pharmapkgs:::.config
             remote_packages <- get_packages()
             local_packages <- get_packages(base_url = .config$local_repo)
-
             assessment_path <- list.files("artifacts_out", ".rds$")
             if (!length(assessment_path)) {
               logger::log_info("No new packages to score", namespace = "pharmapkgs")
@@ -223,8 +221,6 @@ jobs:
             write_packages(new_local_packages)
       - name: Commit file
         run: git add src/contrib/PACKAGES & git commit -m "Update score" & git push
-
-
   # -----------------------------------------------------------------
   # JOB 5: Update Website
   # -----------------------------------------------------------------
