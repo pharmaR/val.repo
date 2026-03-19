@@ -220,7 +220,10 @@ jobs:
             new_local_packages <- update_packages(local_packages, scored_packages)
             write_packages(new_local_packages)
       - name: Commit file
-        run: git add src/contrib/PACKAGES & git commit -m "Update score" & git push
+        run: |
+            git config user.email "bot@github.com"
+            git config user.name "PharmaR validation hub"
+            git add src/contrib/PACKAGES & git commit -m "Update score" & git push
   # -----------------------------------------------------------------
   # JOB 5: Update Website
   # -----------------------------------------------------------------
