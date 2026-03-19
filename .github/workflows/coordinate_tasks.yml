@@ -149,6 +149,21 @@ jobs:
         with:
           path: artifacts_out/
 
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: false
+          Ncpus: 4
+
+      - name: Install Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: ${{ matrix.package }}
+          extra-packages: any::pak, github::pharmaR/riskmetric, github::pharmaR/val.meter, github::pharmaR/val.report
+
       - name: Generate Report
         run: |
           library("val.report")
@@ -205,6 +220,7 @@ jobs:
             remote_packages <- get_packages()
             local_packages <- get_packages(base_url = .config$local_repo)
             assessment_path <- list.files("artifacts_out", ".rds$")
+            cat(sprintf("assessment_path:, %s", toString(sQuote(assessment_path))))
             if (!length(assessment_path)) {
               logger::log_info("No new packages to score", namespace = "pharmapkgs")
               q(save = "no")
