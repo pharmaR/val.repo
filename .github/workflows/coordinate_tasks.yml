@@ -246,12 +246,12 @@ jobs:
             cat("Updated packages!", file = stderr())
             write_packages(new_local_packages)
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        with:
-          detached: true
-          timeout-minutes: 15
-          limit-access-to-actor: true
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+      #   with:
+      #     detached: true
+      #     timeout-minutes: 15
+      #     limit-access-to-actor: true
       - name: Commit file
         run: |
             git config user.email "bot@github.com"
