@@ -223,7 +223,7 @@ jobs:
             assessment_path <- list.files("artifacts_out", ".rds$", full.names = TRUE)
             cat(sprintf("assessment_path:, %s", toString(sQuote(basename(assessment_path)))), file = stderr())
             if (!length(assessment_path)) {
-              logger::log_info("No new packages to score", namespace = "pharmapkgs")
+              logger::log_info("No new packages to score!", namespace = "pharmapkgs")
               q(save = "no")
             }
             names(assessment_path) <- tools::file_path_sans_ext(basename(assessment_path))
@@ -239,16 +239,15 @@ jobs:
                                  Version = remote_packages$Version[match(names(score), remote_packages$Package)],
                                  new_metrics)
 
-            cat("New metrics packages provided", file = stderr())
+            cat("New metrics packages provided!", file = stderr())
             scored_packages <- add_score_to_packages(remote_packages, new_metrics)
-            cat("Added scores", file = stderr())
+            cat("Added scores!", file = stderr())
             new_local_packages <- update_packages(local_packages, scored_packages)
-            cat("Updated packages", file = stderr())
+            cat("Updated packages!", file = stderr())
             write_packages(new_local_packages)
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
-        if: ${{ failure() }}
         with:
           detached: true
           timeout-minutes: 15
