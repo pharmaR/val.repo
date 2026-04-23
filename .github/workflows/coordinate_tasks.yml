@@ -220,7 +220,7 @@ jobs:
             remote_packages <- get_packages()
             local_packages <- get_packages(base_url = .config$local_repo)
             metrics_columns <- setdiff(colnames(local_packages), colnames(remote_packages))
-            assessment_path <- list.files("artifacts_out", ".rds$", full.names = TRUE)
+            assessment_path <- list.files("artifacts_out", ".rds$", recursive = TRUE, full.names = TRUE)
             cat(sprintf("assessment_path:, %s", toString(sQuote(basename(assessment_path)))), file = stderr())
             if (!length(assessment_path)) {
               logger::log_info("No new packages to score!", namespace = "pharmapkgs")
